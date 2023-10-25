@@ -3,6 +3,8 @@ Reference - https://www.youtube.com/watch?v=a-lGAp9vWaQ
 
 **Note:** As of 10/17/23, there appears to be a brew installation available - https://formulae.brew.sh/formula/opentofu
 
+**Valid and tested in GitLab and VSCode**
+
 1. Download and Install go language from the official website. Ref - https://go.dev/doc/install
 2. Download and Install TOFU from the official website. Ref - https://opentofu.org/docs/cli/install/apt/
 3. Clone the official opentofu repo.
