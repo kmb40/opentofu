@@ -47,6 +47,20 @@ BUG FIXES:
 * cloud: fixed a bug that would prevent nested symlinks from being dereferenced into the config sent to Cloud ([#686](https://github.com/opentofu/opentofu/issues/686)) 
 * cloud: state snapshots could not be disabled when header x-terraform-snapshot-interval is absent ([#687](https://github.com/opentofu/opentofu/issues/687))
 
+S3 BACKEND:
+
+* The S3 backend was upgraded to use the V2 of the AWS SDK for Go ([#691](https://github.com/opentofu/opentofu/issues/691))
+* Adds support for `shared_config_files` and `shared_credentials_files` arguments and deprecates the `shared_credentials_file` argument. ([#690](https://github.com/opentofu/opentofu/issues/690))
+* Arguments associated with assuming an IAM role were moved into a nested block - `assume_role`.
+  This deprecates the arguments `role_arn`, `session_name`, `external_id`, `assume_role_duration_seconds`, `assume_role_policy`, `assume_role_policy_arns`, `assume_role_tags`, and `assume_role_transitive_tag_keys`. ([#747](https://github.com/opentofu/opentofu/issues/747))
+* Adds support for the `assume_role_with_web_identity` block. ([#689](https://github.com/opentofu/opentofu/issues/689))
+* Adds support for account whitelisting using the `forbidden_account_ids` and `allowed_account_ids` arguments. ([#699](https://github.com/opentofu/opentofu/issues/699))
+* Adds the `custom_ca_bundle` argument. ([#689](https://github.com/opentofu/opentofu/issues/689))
+* Adds support for the `sts_region` argument. ([#695](https://github.com/opentofu/opentofu/issues/695))
+* Adds support for `ec2_metadata_service_endpoint` and `ec2_metadata_service_endpoint_mode` arguments to enable overriding the EC2 metadata service (IMDS) endpoint. ([#693](https://github.com/opentofu/opentofu/issues/693))
+* Adds support for the `retry_mode` attribute. ([#698](https://github.com/opentofu/opentofu/issues/698))
+* Adds support for the `http_proxy`, `insecure`, `use_dualstack_endpoint`, and `use_fips_endpoint` attributes. ([#694](https://github.com/opentofu/opentofu/issues/694))
+
 ## Previous Releases
 
 For information on prior major and minor releases, see their changelogs:

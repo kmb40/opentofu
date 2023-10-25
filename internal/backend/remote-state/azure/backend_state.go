@@ -23,13 +23,12 @@ const (
 	keyEnvPrefix = "env:"
 )
 
-func (b *Backend) Workspaces() ([]string, error) {
+func (b *Backend) Workspaces(ctx context.Context) ([]string, error) {
 	prefix := b.keyName + keyEnvPrefix
 	params := containers.ListBlobsInput{
 		Prefix: &prefix,
 	}
 
-	ctx := context.TODO()
 	client, err := b.armClient.getContainersClient(ctx)
 	if err != nil {
 		return nil, err
@@ -61,12 +60,11 @@ func (b *Backend) Workspaces() ([]string, error) {
 	return result, nil
 }
 
-func (b *Backend) DeleteWorkspace(name string, _ bool) error {
+func (b *Backend) DeleteWorkspace(ctx context.Context, name string, _ bool) error {
 	if name == backend.DefaultStateName || name == "" {
 		return fmt.Errorf("can't delete default state")
 	}
 
-	ctx := context.TODO()
 	client, err := b.armClient.getBlobClient(ctx)
 	if err != nil {
 		return err
@@ -81,8 +79,7 @@ func (b *Backend) DeleteWorkspace(name string, _ bool) error {
 	return nil
 }
 
-func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
-	ctx := context.TODO()
+func (b *Backend) StateMgr(ctx context.Context, name string) (statemgr.Full, error) {
 	blobClient, err := b.armClient.getBlobClient(ctx)
 	if err != nil {
 		return nil, err
@@ -99,7 +96,7 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 	stateMgr := &remote.State{Client: client}
 
 	// Grab the value
-	if err := stateMgr.RefreshState(); err != nil {
+	if err := stateMgr.RefreshState(ctx); err != nil {
 		return nil, err
 	}
 	//if this isn't the default state name, we need to create the object so
@@ -108,21 +105,21 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 		// take a lock on this state while we write it
 		lockInfo := statemgr.NewLockInfo()
 		lockInfo.Operation = "init"
-		lockId, err := client.Lock(lockInfo)
+		lockId, err := client.Lock(ctx, lockInfo)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock azure state: %w", err)
 		}
 
 		// Local helper function so we can call it multiple places
 		lockUnlock := func(parent error) error {
-			if err := stateMgr.Unlock(lockId); err != nil {
+			if err := stateMgr.Unlock(ctx, lockId); err != nil {
 				return fmt.Errorf(strings.TrimSpace(errStateUnlock), lockId, err)
 			}
 			return parent
 		}
 
 		// Grab the value
-		if err := stateMgr.RefreshState(); err != nil {
+		if err := stateMgr.RefreshState(ctx); err != nil {
 			err = lockUnlock(err)
 			return nil, err
 		}
@@ -134,7 +131,7 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 				err = lockUnlock(err)
 				return nil, err
 			}
-			if err := stateMgr.PersistState(nil); err != nil {
+			if err := stateMgr.PersistState(ctx, nil); err != nil {
 				err = lockUnlock(err)
 				return nil, err
 			}
@@ -147,10 +144,6 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 	}
 
 	return stateMgr, nil
-}
-
-func (b *Backend) client() *RemoteClient {
-	return &RemoteClient{}
 }
 
 func (b *Backend) path(name string) string {

@@ -4,6 +4,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -137,12 +138,14 @@ func TestLocalRun_stalePlan(t *testing.T) {
 		t.Fatalf("unexpected error writing state file: %s", err)
 	}
 
+	ctx := context.Background()
+
 	// Refresh the state
-	sm, err := b.StateMgr("")
+	sm, err := b.StateMgr(ctx, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
-	if err := sm.RefreshState(); err != nil {
+	if err := sm.RefreshState(ctx); err != nil {
 		t.Fatalf("unexpected error refreshing state: %s", err)
 	}
 
@@ -212,27 +215,27 @@ type backendWithStateStorageThatFailsRefresh struct {
 
 var _ backend.Backend = backendWithStateStorageThatFailsRefresh{}
 
-func (b backendWithStateStorageThatFailsRefresh) StateMgr(workspace string) (statemgr.Full, error) {
+func (b backendWithStateStorageThatFailsRefresh) StateMgr(_ context.Context, workspace string) (statemgr.Full, error) {
 	return &stateStorageThatFailsRefresh{}, nil
 }
 
-func (b backendWithStateStorageThatFailsRefresh) ConfigSchema() *configschema.Block {
+func (b backendWithStateStorageThatFailsRefresh) ConfigSchema(context.Context) *configschema.Block {
 	return &configschema.Block{}
 }
 
-func (b backendWithStateStorageThatFailsRefresh) PrepareConfig(in cty.Value) (cty.Value, tfdiags.Diagnostics) {
+func (b backendWithStateStorageThatFailsRefresh) PrepareConfig(_ context.Context, in cty.Value) (cty.Value, tfdiags.Diagnostics) {
 	return in, nil
 }
 
-func (b backendWithStateStorageThatFailsRefresh) Configure(cty.Value) tfdiags.Diagnostics {
+func (b backendWithStateStorageThatFailsRefresh) Configure(context.Context, cty.Value) tfdiags.Diagnostics {
 	return nil
 }
 
-func (b backendWithStateStorageThatFailsRefresh) DeleteWorkspace(name string, force bool) error {
+func (b backendWithStateStorageThatFailsRefresh) DeleteWorkspace(_ context.Context, name string, force bool) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (b backendWithStateStorageThatFailsRefresh) Workspaces() ([]string, error) {
+func (b backendWithStateStorageThatFailsRefresh) Workspaces(context.Context) ([]string, error) {
 	return []string{"default"}, nil
 }
 
@@ -240,7 +243,7 @@ type stateStorageThatFailsRefresh struct {
 	locked bool
 }
 
-func (s *stateStorageThatFailsRefresh) Lock(info *statemgr.LockInfo) (string, error) {
+func (s *stateStorageThatFailsRefresh) Lock(_ context.Context, info *statemgr.LockInfo) (string, error) {
 	if s.locked {
 		return "", fmt.Errorf("already locked")
 	}
@@ -248,7 +251,7 @@ func (s *stateStorageThatFailsRefresh) Lock(info *statemgr.LockInfo) (string, er
 	return "locked", nil
 }
 
-func (s *stateStorageThatFailsRefresh) Unlock(id string) error {
+func (s *stateStorageThatFailsRefresh) Unlock(_ context.Context, id string) error {
 	if !s.locked {
 		return fmt.Errorf("not locked")
 	}
@@ -260,7 +263,7 @@ func (s *stateStorageThatFailsRefresh) State() *states.State {
 	return nil
 }
 
-func (s *stateStorageThatFailsRefresh) GetRootOutputValues() (map[string]*states.OutputValue, error) {
+func (s *stateStorageThatFailsRefresh) GetRootOutputValues(context.Context) (map[string]*states.OutputValue, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 
@@ -268,10 +271,10 @@ func (s *stateStorageThatFailsRefresh) WriteState(*states.State) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (s *stateStorageThatFailsRefresh) RefreshState() error {
+func (s *stateStorageThatFailsRefresh) RefreshState(context.Context) error {
 	return fmt.Errorf("intentionally failing for testing purposes")
 }
 
-func (s *stateStorageThatFailsRefresh) PersistState(schemas *tofu.Schemas) error {
+func (s *stateStorageThatFailsRefresh) PersistState(_ context.Context, schemas *tofu.Schemas) error {
 	return fmt.Errorf("unimplemented")
 }

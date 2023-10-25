@@ -190,7 +190,9 @@ func TestRemoteContextWithVars(t *testing.T) {
 			_, configLoader, configCleanup := initwd.MustLoadConfigForTests(t, configDir, "tests")
 			defer configCleanup()
 
-			workspaceID, err := b.getRemoteWorkspaceID(context.Background(), backend.DefaultStateName)
+			ctx := context.Background()
+
+			workspaceID, err := b.getRemoteWorkspaceID(ctx, backend.DefaultStateName)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -210,7 +212,8 @@ func TestRemoteContextWithVars(t *testing.T) {
 				key := "key"
 				v.Key = &key
 			}
-			b.client.Variables.Create(context.TODO(), workspaceID, *v)
+
+			b.client.Variables.Create(ctx, workspaceID, *v)
 
 			_, _, diags := b.LocalRun(op)
 
@@ -224,8 +227,8 @@ func TestRemoteContextWithVars(t *testing.T) {
 				}
 				// When Context() returns an error, it should unlock the state,
 				// so re-locking it is expected to succeed.
-				stateMgr, _ := b.StateMgr(backend.DefaultStateName)
-				if _, err := stateMgr.Lock(statemgr.NewLockInfo()); err != nil {
+				stateMgr, _ := b.StateMgr(ctx, backend.DefaultStateName)
+				if _, err := stateMgr.Lock(ctx, statemgr.NewLockInfo()); err != nil {
 					t.Fatalf("unexpected error locking state: %s", err.Error())
 				}
 			} else {
@@ -233,8 +236,8 @@ func TestRemoteContextWithVars(t *testing.T) {
 					t.Fatalf("unexpected error\ngot:  %s\nwant: <no error>", diags.Err().Error())
 				}
 				// When Context() succeeds, this should fail w/ "workspace already locked"
-				stateMgr, _ := b.StateMgr(backend.DefaultStateName)
-				if _, err := stateMgr.Lock(statemgr.NewLockInfo()); err == nil {
+				stateMgr, _ := b.StateMgr(ctx, backend.DefaultStateName)
+				if _, err := stateMgr.Lock(ctx, statemgr.NewLockInfo()); err == nil {
 					t.Fatal("unexpected success locking state after Context")
 				}
 			}
@@ -429,8 +432,10 @@ func TestRemoteVariablesDoNotOverride(t *testing.T) {
 				Variables:    test.localVariables,
 			}
 
+			ctx := context.Background()
+
 			for _, v := range test.remoteVariables {
-				b.client.Variables.Create(context.TODO(), workspaceID, *v)
+				b.client.Variables.Create(ctx, workspaceID, *v)
 			}
 
 			lr, _, diags := b.LocalRun(op)
@@ -439,8 +444,8 @@ func TestRemoteVariablesDoNotOverride(t *testing.T) {
 				t.Fatalf("unexpected error\ngot:  %s\nwant: <no error>", diags.Err().Error())
 			}
 			// When Context() succeeds, this should fail w/ "workspace already locked"
-			stateMgr, _ := b.StateMgr(backend.DefaultStateName)
-			if _, err := stateMgr.Lock(statemgr.NewLockInfo()); err == nil {
+			stateMgr, _ := b.StateMgr(ctx, backend.DefaultStateName)
+			if _, err := stateMgr.Lock(ctx, statemgr.NewLockInfo()); err == nil {
 				t.Fatal("unexpected success locking state after Context")
 			}
 

@@ -4,6 +4,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -109,12 +110,15 @@ func (c *StateShowCommand) Run(args []string) int {
 		c.Streams.Eprintf("Error selecting workspace: %s\n", err)
 		return 1
 	}
-	stateMgr, err := b.StateMgr(env)
+
+	ctx := context.TODO()
+
+	stateMgr, err := b.StateMgr(ctx, env)
 	if err != nil {
 		c.Streams.Eprintln(fmt.Sprintf(errStateLoadingState, err))
 		return 1
 	}
-	if err := stateMgr.RefreshState(); err != nil {
+	if err := stateMgr.RefreshState(ctx); err != nil {
 		c.Streams.Eprintf("Failed to refresh state: %s\n", err)
 		return 1
 	}

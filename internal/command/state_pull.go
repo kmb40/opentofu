@@ -5,6 +5,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
@@ -47,12 +48,15 @@ func (c *StatePullCommand) Run(args []string) int {
 		c.Ui.Error(fmt.Sprintf("Error selecting workspace: %s", err))
 		return 1
 	}
-	stateMgr, err := b.StateMgr(env)
+
+	ctx := context.TODO()
+
+	stateMgr, err := b.StateMgr(ctx, env)
 	if err != nil {
 		c.Ui.Error(fmt.Sprintf(errStateLoadingState, err))
 		return 1
 	}
-	if err := stateMgr.RefreshState(); err != nil {
+	if err := stateMgr.RefreshState(ctx); err != nil {
 		c.Ui.Error(fmt.Sprintf("Failed to refresh state: %s", err))
 		return 1
 	}

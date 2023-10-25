@@ -1,5 +1,59 @@
 # Weekly Updates
 
+## 2023-10-24
+
+Hey!
+
+This week was again spent on discussing and PoC'in stable registry designs, as well as work on the S3 backend.
+
+- Current Status
+  - There are [two registry RFCs right now](https://github.com/opentofu/opentofu/issues?q=is%3Aopen+is%3Aissue+label%3Arfc+label%3Af-registry), and both will most likely have a PoC by the end of the week.
+  - [Extensive work is happening](https://github.com/opentofu/opentofu/issues/700) around updating the S3 state backend configuration to be in line with the AWS provider configuration.
+  - OpenTofu is available on Homebrew Core, so you can just `brew install opentofu` to use it!
+  - A [bug report](https://github.com/opentofu/opentofu/issues/763) has surfaced an interesting issue when migrating from Terraform to OpenTofu with an existing state file. An initial fix [has already been implemented](https://github.com/opentofu/opentofu/pull/773) and will be further polished and released soon.
+- Up next
+  - The steering committee will pick a registry RFC in the week of 30th Oct - 3rd Nov.
+    - Intense implementation work will start on the 6th of November.
+    - This should let us have a stable registry in place around mid-November - mid-December.
+- How can I help?
+  - Since the alpha release is out, right now the best way to help is to take the alpha for a test drive and see if there are any bugs / issues.
+  - You can also submit and discuss RFCs related to the stable registry.
+  - Other than that, the best way to help is to create issues, discuss on issues, and spread the word about OpenTofu.
+  - There are some occasional minor issues which are accepted and open to external contribution, esp. ones outside the release-blocking path. We’re also happy to accept any minor refactors or linter fixes. [Please see the contributing guide for more details](https://github.com/opentofu/opentofu/blob/main/CONTRIBUTING.md).
+  - We have multiple engineers available full-time in the core team, so we’re generally trying to own any issues that are release blockers - this way we can make sure we get to the release as soon as possible.
+  - The amount of pending-decision-labeled issues on the repository might be a bit off-putting. The reason for that is that right now we’re prioritizing the alpha and stable release. Only after we have a stable release in place do we aim to start actually accepting enhancement proposals and getting them implemented/merged. Still, we encourage you to open those issues and discuss them!
+    - Issues and Pull Requests with enhancements or major changes will generally be frozen until we have the first stable release out. We will introduce a milestone to mark them as such more clearly.
+
+Please let us know if you have any feedback on what we could improve, either with these updates or more generally - this very document was a result of such feedback! We're available on Slack, via GitHub issues, or even in the pull request updating this file.
+
+## 2023-10-17
+
+Hello there!
+
+This past week was mostly spent on creating stable registry designs, which is a prerequisite to building a stable provider/module registry and releasing a stable version of OpenTofu.
+
+- Current Status
+  - The [registry replacement issue](https://github.com/opentofu/opentofu/issues/258) has now been updated to include a list of stable registry requirements.
+    - There is now time until the 27th October to submit and discuss RFCs.
+    - You can find relevant RFCs by using [GitHub Issue search](https://github.com/opentofu/opentofu/issues?q=is%3Aopen+is%3Aissue+label%3Arfc+label%3Af-registry).
+    - After the 27th October the Technical Steering Committee will pick a single RFC which will then be implemented.
+  - A [setup-opentofu](https://github.com/opentofu/setup-opentofu) GitHub Action is now available, it's a great way to take OpenTofu for a spin on GitHub Actions. Thanks a lot to @kislerdm for contributing this!
+  - Work on TF 1.6 compatibility has been done.
+  - We've closed a lot of issues that were stable release blockers, you can take a look at the current stable milestone status [here](https://github.com/opentofu/opentofu/milestone/3).
+- Up next
+  - The main TF 1.6 compatibility issue left, on which work has already been started and will continue for a while is the new S3 state backend configuration schema. You can track this issue [here](https://github.com/opentofu/opentofu/issues/700).
+  - Until the 27th October deadline, work and discussion on RFCs will happen, as well as the implementation of PoCs for some of these RFCs.
+- How can I help?
+  - Since the alpha release is out, right now the best way to help is to take the alpha for a test drive and see if there are any bugs / issues.
+  - You can also submit and discuss RFCs related to the stable registry.
+  - Other than that, the best way to help is to create issues, discuss on issues, and spread the word about OpenTofu.
+  - There are some occasional minor issues which are accepted and open to external contribution, esp. ones outside the release-blocking path. We’re also happy to accept any minor refactors or linter fixes. [Please see the contributing guide for more details](https://github.com/opentofu/opentofu/blob/main/CONTRIBUTING.md).
+  - We have multiple engineers available full-time in the core team, so we’re generally trying to own any issues that are release blockers - this way we can make sure we get to the release as soon as possible.
+  - The amount of pending-decision-labeled issues on the repository might be a bit off-putting. The reason for that is that right now we’re prioritizing the alpha and stable release. Only after we have a stable release in place do we aim to start actually accepting enhancement proposals and getting them implemented/merged. Still, we encourage you to open those issues and discuss them!
+    - Issues and Pull Requests with enhancements or major changes will generally be frozen until we have the first stable release out. We will introduce a milestone to mark them as such more clearly.
+
+Please let us know if you have any feedback on what we could improve, either with these updates or more generally - this very document was a result of such feedback! We're available on Slack, via GitHub issues, or even in the pull request updating this file.
+
 ## 2023-10-11
 
 Hey!

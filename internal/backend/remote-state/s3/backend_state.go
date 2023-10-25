@@ -4,15 +4,16 @@
 package s3
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path"
 	"sort"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/opentofu/opentofu/internal/backend"
 	"github.com/opentofu/opentofu/internal/states"
@@ -20,7 +21,7 @@ import (
 	"github.com/opentofu/opentofu/internal/states/statemgr"
 )
 
-func (b *Backend) Workspaces() ([]string, error) {
+func (b *Backend) Workspaces(ctx context.Context) ([]string, error) {
 	const maxKeys = 1000
 
 	prefix := ""
@@ -29,25 +30,32 @@ func (b *Backend) Workspaces() ([]string, error) {
 		prefix = b.workspaceKeyPrefix + "/"
 	}
 
-	params := &s3.ListObjectsInput{
-		Bucket:  &b.bucketName,
+	params := &s3.ListObjectsV2Input{
+		Bucket:  aws.String(b.bucketName),
 		Prefix:  aws.String(prefix),
-		MaxKeys: aws.Int64(maxKeys),
+		MaxKeys: maxKeys,
 	}
 
 	wss := []string{backend.DefaultStateName}
-	err := b.s3Client.ListObjectsPages(params, func(page *s3.ListObjectsOutput, lastPage bool) bool {
+	pg := s3.NewListObjectsV2Paginator(b.s3Client, params)
+
+	for pg.HasMorePages() {
+		page, err := pg.NextPage(ctx)
+		if err != nil {
+			var e *types.NoSuchBucket
+			if errors.As(err, &e) {
+				return nil, fmt.Errorf(errS3NoSuchBucket, err)
+			}
+
+			return nil, err
+		}
+
 		for _, obj := range page.Contents {
 			ws := b.keyEnv(*obj.Key)
 			if ws != "" {
 				wss = append(wss, ws)
 			}
 		}
-		return !lastPage
-	})
-
-	if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == s3.ErrCodeNoSuchBucket {
-		return nil, fmt.Errorf(errS3NoSuchBucket, err)
 	}
 
 	sort.Strings(wss[1:])
@@ -93,7 +101,7 @@ func (b *Backend) keyEnv(key string) string {
 	return parts[0]
 }
 
-func (b *Backend) DeleteWorkspace(name string, _ bool) error {
+func (b *Backend) DeleteWorkspace(ctx context.Context, name string, _ bool) error {
 	if name == backend.DefaultStateName || name == "" {
 		return fmt.Errorf("can't delete default state")
 	}
@@ -103,7 +111,7 @@ func (b *Backend) DeleteWorkspace(name string, _ bool) error {
 		return err
 	}
 
-	return client.Delete()
+	return client.Delete(ctx)
 }
 
 // get a remote client configured for this state
@@ -127,7 +135,7 @@ func (b *Backend) remoteClient(name string) (*RemoteClient, error) {
 	return client, nil
 }
 
-func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
+func (b *Backend) StateMgr(ctx context.Context, name string) (statemgr.Full, error) {
 	client, err := b.remoteClient(name)
 	if err != nil {
 		return nil, err
@@ -142,7 +150,7 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 	// If we need to force-unlock, but for some reason the state no longer
 	// exists, the user will have to use aws tools to manually fix the
 	// situation.
-	existing, err := b.Workspaces()
+	existing, err := b.Workspaces(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,14 +168,14 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 		// take a lock on this state while we write it
 		lockInfo := statemgr.NewLockInfo()
 		lockInfo.Operation = "init"
-		lockId, err := client.Lock(lockInfo)
+		lockId, err := client.Lock(ctx, lockInfo)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock s3 state: %w", err)
 		}
 
 		// Local helper function so we can call it multiple places
 		lockUnlock := func(parent error) error {
-			if err := stateMgr.Unlock(lockId); err != nil {
+			if err := stateMgr.Unlock(ctx, lockId); err != nil {
 				return fmt.Errorf(strings.TrimSpace(errStateUnlock), lockId, err)
 			}
 			return parent
@@ -176,7 +184,7 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 		// Grab the value
 		// This is to ensure that no one beat us to writing a state between
 		// the `exists` check and taking the lock.
-		if err := stateMgr.RefreshState(); err != nil {
+		if err := stateMgr.RefreshState(ctx); err != nil {
 			err = lockUnlock(err)
 			return nil, err
 		}
@@ -187,7 +195,7 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 				err = lockUnlock(err)
 				return nil, err
 			}
-			if err := stateMgr.PersistState(nil); err != nil {
+			if err := stateMgr.PersistState(ctx, nil); err != nil {
 				err = lockUnlock(err)
 				return nil, err
 			}

@@ -39,9 +39,11 @@ func (b *Local) LocalRun(op *backend.Operation) (*backend.LocalRun, statemgr.Ful
 func (b *Local) localRun(op *backend.Operation) (*backend.LocalRun, *configload.Snapshot, statemgr.Full, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 
+	ctx := context.TODO()
+
 	// Get the latest state.
 	log.Printf("[TRACE] backend/local: requesting state manager for workspace %q", op.Workspace)
-	s, err := b.StateMgr(op.Workspace)
+	s, err := b.StateMgr(ctx, op.Workspace)
 	if err != nil {
 		diags = diags.Append(fmt.Errorf("error loading state: %w", err))
 		return nil, nil, nil, diags
@@ -60,7 +62,7 @@ func (b *Local) localRun(op *backend.Operation) (*backend.LocalRun, *configload.
 	}()
 
 	log.Printf("[TRACE] backend/local: reading remote state for workspace %q", op.Workspace)
-	if err := s.RefreshState(); err != nil {
+	if err := s.RefreshState(ctx); err != nil {
 		diags = diags.Append(fmt.Errorf("error loading state: %w", err))
 		return nil, nil, nil, diags
 	}

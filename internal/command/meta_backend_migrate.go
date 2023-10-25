@@ -186,7 +186,7 @@ func (m *Meta) backendMigrateState_S_S(opts *backendMigrateOpts) error {
 	}
 
 	// Read all the states
-	sourceWorkspaces, err := opts.Source.Workspaces()
+	sourceWorkspaces, err := opts.Source.Workspaces(context.TODO())
 	if err != nil {
 		return fmt.Errorf(strings.TrimSpace(
 			errMigrateLoadStates), opts.SourceType, err)
@@ -250,7 +250,7 @@ func (m *Meta) backendMigrateState_S_s(opts *backendMigrateOpts) error {
 	// Copy the default state
 	opts.sourceWorkspace = currentWorkspace
 
-	// now switch back to the default env so we can acccess the new backend
+	// now switch back to the default env so we can access the new backend
 	m.SetWorkspace(backend.DefaultStateName)
 
 	return m.backendMigrateState_s_s(opts)
@@ -260,12 +260,14 @@ func (m *Meta) backendMigrateState_S_s(opts *backendMigrateOpts) error {
 func (m *Meta) backendMigrateState_s_s(opts *backendMigrateOpts) error {
 	log.Printf("[INFO] backendMigrateState: single-to-single migrating %q workspace to %q workspace", opts.sourceWorkspace, opts.destinationWorkspace)
 
-	sourceState, err := opts.Source.StateMgr(opts.sourceWorkspace)
+	ctx := context.TODO()
+
+	sourceState, err := opts.Source.StateMgr(ctx, opts.sourceWorkspace)
 	if err != nil {
 		return fmt.Errorf(strings.TrimSpace(
 			errMigrateSingleLoadDefault), opts.SourceType, err)
 	}
-	if err := sourceState.RefreshState(); err != nil {
+	if err := sourceState.RefreshState(ctx); err != nil {
 		return fmt.Errorf(strings.TrimSpace(
 			errMigrateSingleLoadDefault), opts.SourceType, err)
 	}
@@ -276,7 +278,7 @@ func (m *Meta) backendMigrateState_s_s(opts *backendMigrateOpts) error {
 		return nil
 	}
 
-	destinationState, err := opts.Destination.StateMgr(opts.destinationWorkspace)
+	destinationState, err := opts.Destination.StateMgr(ctx, opts.destinationWorkspace)
 	if err == backend.ErrDefaultWorkspaceNotSupported {
 		// If the backend doesn't support using the default state, we ask the user
 		// for a new name and migrate the default state to the given named state.
@@ -290,7 +292,7 @@ func (m *Meta) backendMigrateState_s_s(opts *backendMigrateOpts) error {
 			// Update the name of the destination state.
 			opts.destinationWorkspace = name
 
-			destinationState, err := opts.Destination.StateMgr(opts.destinationWorkspace)
+			destinationState, err := opts.Destination.StateMgr(ctx, opts.destinationWorkspace)
 			if err != nil {
 				return nil, err
 			}
@@ -313,7 +315,7 @@ func (m *Meta) backendMigrateState_s_s(opts *backendMigrateOpts) error {
 		return fmt.Errorf(strings.TrimSpace(
 			errMigrateSingleLoadDefault), opts.DestinationType, err)
 	}
-	if err := destinationState.RefreshState(); err != nil {
+	if err := destinationState.RefreshState(ctx); err != nil {
 		return fmt.Errorf(strings.TrimSpace(
 			errMigrateSingleLoadDefault), opts.DestinationType, err)
 	}
@@ -366,12 +368,12 @@ func (m *Meta) backendMigrateState_s_s(opts *backendMigrateOpts) error {
 		// We now own a lock, so double check that we have the version
 		// corresponding to the lock.
 		log.Print("[TRACE] backendMigrateState: refreshing source workspace state")
-		if err := sourceState.RefreshState(); err != nil {
+		if err := sourceState.RefreshState(ctx); err != nil {
 			return fmt.Errorf(strings.TrimSpace(
 				errMigrateSingleLoadDefault), opts.SourceType, err)
 		}
 		log.Print("[TRACE] backendMigrateState: refreshing destination workspace state")
-		if err := destinationState.RefreshState(); err != nil {
+		if err := destinationState.RefreshState(ctx); err != nil {
 			return fmt.Errorf(strings.TrimSpace(
 				errMigrateSingleLoadDefault), opts.SourceType, err)
 		}
@@ -449,8 +451,8 @@ func (m *Meta) backendMigrateState_s_s(opts *backendMigrateOpts) error {
 	// The backend is currently handled before providers are installed during init,
 	// so requiring schemas here could lead to a catch-22 where it requires some manual
 	// intervention to proceed far enough for provider installation. To avoid this,
-	// when migrating to TFC backend, the initial JSON varient of state won't be generated and stored.
-	if err := destinationState.PersistState(nil); err != nil {
+	// when migrating to TFC backend, the initial JSON variant of state won't be generated and stored.
+	if err := destinationState.PersistState(ctx, nil); err != nil {
 		return fmt.Errorf(strings.TrimSpace(errBackendStateCopy),
 			opts.SourceType, opts.DestinationType, err)
 	}
@@ -536,7 +538,7 @@ func (m *Meta) backendMigrateNonEmptyConfirm(
 func retrieveWorkspaces(back backend.Backend, sourceType string) ([]string, bool, error) {
 	var singleState bool
 	var err error
-	workspaces, err := back.Workspaces()
+	workspaces, err := back.Workspaces(context.TODO())
 	if err == backend.ErrWorkspacesNotSupported {
 		singleState = true
 		err = nil
@@ -557,7 +559,7 @@ func (m *Meta) backendMigrateTFC(opts *backendMigrateOpts) error {
 	if err != nil {
 		return err
 	}
-	//to be used below, not yet implamented
+	//to be used below, not yet implemented
 	// destinationWorkspaces, destinationSingleState
 	_, _, err = retrieveWorkspaces(opts.Destination, opts.SourceType)
 	if err != nil {
@@ -592,13 +594,15 @@ func (m *Meta) backendMigrateTFC(opts *backendMigrateOpts) error {
 
 		log.Printf("[INFO] backendMigrateTFC: single-to-single migration from source %s to destination %q", opts.sourceWorkspace, opts.destinationWorkspace)
 
+		ctx := context.TODO()
+
 		// If the current workspace is has no state we do not need to ask
 		// if they want to migrate the state.
-		sourceState, err := opts.Source.StateMgr(currentWorkspace)
+		sourceState, err := opts.Source.StateMgr(ctx, currentWorkspace)
 		if err != nil {
 			return err
 		}
-		if err := sourceState.RefreshState(); err != nil {
+		if err := sourceState.RefreshState(ctx); err != nil {
 			return err
 		}
 		if sourceState.State().Empty() {
@@ -662,6 +666,8 @@ func (m *Meta) backendMigrateTFC(opts *backendMigrateOpts) error {
 func (m *Meta) backendMigrateState_S_TFC(opts *backendMigrateOpts, sourceWorkspaces []string) error {
 	log.Print("[TRACE] backendMigrateState: migrating all named workspaces")
 
+	ctx := context.TODO()
+
 	currentWorkspace, err := m.Workspace()
 	if err != nil {
 		return err
@@ -680,13 +686,13 @@ func (m *Meta) backendMigrateState_S_TFC(opts *backendMigrateOpts, sourceWorkspa
 		if sourceWorkspaces[i] == backend.DefaultStateName {
 			// For the default workspace we want to look to see if there is any state
 			// before we ask for a workspace name to migrate the default workspace into.
-			sourceState, err := opts.Source.StateMgr(backend.DefaultStateName)
+			sourceState, err := opts.Source.StateMgr(ctx, backend.DefaultStateName)
 			if err != nil {
 				return fmt.Errorf(strings.TrimSpace(
 					errMigrateSingleLoadDefault), opts.SourceType, err)
 			}
 			// RefreshState is what actually pulls the state to be evaluated.
-			if err := sourceState.RefreshState(); err != nil {
+			if err := sourceState.RefreshState(ctx); err != nil {
 				return fmt.Errorf(strings.TrimSpace(
 					errMigrateSingleLoadDefault), opts.SourceType, err)
 			}
@@ -755,7 +761,7 @@ func (m *Meta) backendMigrateState_S_TFC(opts *backendMigrateOpts, sourceWorkspa
 
 	// After migrating multiple workspaces, we need to reselect the current workspace as it may
 	// have been renamed. Query the backend first to be sure it now exists.
-	workspaces, err := opts.Destination.Workspaces()
+	workspaces, err := opts.Destination.Workspaces(context.TODO())
 	if err != nil {
 		return err
 	}

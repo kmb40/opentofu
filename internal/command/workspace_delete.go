@@ -4,6 +4,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -74,7 +75,9 @@ func (c *WorkspaceDeleteCommand) Run(args []string) int {
 	// This command will not write state
 	c.ignoreRemoteVersionConflict(b)
 
-	workspaces, err := b.Workspaces()
+	ctx := context.TODO()
+
+	workspaces, err := b.Workspaces(ctx)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
@@ -105,7 +108,7 @@ func (c *WorkspaceDeleteCommand) Run(args []string) int {
 	}
 
 	// we need the actual state to see if it's empty
-	stateMgr, err := b.StateMgr(workspace)
+	stateMgr, err := b.StateMgr(ctx, workspace)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
@@ -122,7 +125,7 @@ func (c *WorkspaceDeleteCommand) Run(args []string) int {
 		stateLocker = clistate.NewNoopLocker()
 	}
 
-	if err := stateMgr.RefreshState(); err != nil {
+	if err := stateMgr.RefreshState(ctx); err != nil {
 		// We need to release the lock before exit
 		stateLocker.Unlock()
 		c.Ui.Error(err.Error())
@@ -169,7 +172,7 @@ func (c *WorkspaceDeleteCommand) Run(args []string) int {
 	// be delegated from the Backend to the State itself.
 	stateLocker.Unlock()
 
-	err = b.DeleteWorkspace(workspace, force)
+	err = b.DeleteWorkspace(ctx, workspace, force)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1

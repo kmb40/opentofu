@@ -4,6 +4,7 @@
 package backend
 
 import (
+	"context"
 	"reflect"
 	"sort"
 	"testing"
@@ -36,12 +37,14 @@ func TestBackendConfig(t *testing.T, b Backend, c hcl.Body) Backend {
 		c = hcl.EmptyBody()
 	}
 
-	schema := b.ConfigSchema()
+	ctx := context.Background()
+
+	schema := b.ConfigSchema(ctx)
 	spec := schema.DecoderSpec()
 	obj, decDiags := hcldec.Decode(c, spec, nil)
 	diags = diags.Append(decDiags)
 
-	newObj, valDiags := b.PrepareConfig(obj)
+	newObj, valDiags := b.PrepareConfig(ctx, obj)
 	diags = diags.Append(valDiags.InConfigBody(c, ""))
 
 	// it's valid for a Backend to have warnings (e.g. a Deprecation) as such we should only raise on errors
@@ -51,7 +54,7 @@ func TestBackendConfig(t *testing.T, b Backend, c hcl.Body) Backend {
 
 	obj = newObj
 
-	confDiags := b.Configure(obj)
+	confDiags := b.Configure(ctx, obj)
 	if len(confDiags) != 0 {
 		confDiags = confDiags.InConfigBody(c, "")
 		t.Fatal(confDiags.ErrWithWarnings())
@@ -78,8 +81,10 @@ func TestWrapConfig(raw map[string]interface{}) hcl.Body {
 func TestBackendStates(t *testing.T, b Backend) {
 	t.Helper()
 
+	ctx := context.Background()
+
 	noDefault := false
-	if _, err := b.StateMgr(DefaultStateName); err != nil {
+	if _, err := b.StateMgr(ctx, DefaultStateName); err != nil {
 		if err == ErrDefaultWorkspaceNotSupported {
 			noDefault = true
 		} else {
@@ -87,7 +92,7 @@ func TestBackendStates(t *testing.T, b Backend) {
 		}
 	}
 
-	workspaces, err := b.Workspaces()
+	workspaces, err := b.Workspaces(ctx)
 	if err != nil {
 		if err == ErrWorkspacesNotSupported {
 			t.Logf("TestBackend: workspaces not supported in %T, skipping", b)
@@ -102,22 +107,22 @@ func TestBackendStates(t *testing.T, b Backend) {
 	}
 
 	// Create a couple states
-	foo, err := b.StateMgr("foo")
+	foo, err := b.StateMgr(ctx, "foo")
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	if err := foo.RefreshState(); err != nil {
+	if err := foo.RefreshState(ctx); err != nil {
 		t.Fatalf("bad: %s", err)
 	}
 	if v := foo.State(); v.HasManagedResourceInstanceObjects() {
 		t.Fatalf("should be empty: %s", v)
 	}
 
-	bar, err := b.StateMgr("bar")
+	bar, err := b.StateMgr(ctx, "bar")
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	if err := bar.RefreshState(); err != nil {
+	if err := bar.RefreshState(ctx); err != nil {
 		t.Fatalf("bad: %s", err)
 	}
 	if v := bar.State(); v.HasManagedResourceInstanceObjects() {
@@ -135,7 +140,7 @@ func TestBackendStates(t *testing.T, b Backend) {
 		if err := foo.WriteState(fooState); err != nil {
 			t.Fatal("error writing foo state:", err)
 		}
-		if err := foo.PersistState(nil); err != nil {
+		if err := foo.PersistState(ctx, nil); err != nil {
 			t.Fatal("error persisting foo state:", err)
 		}
 
@@ -163,12 +168,12 @@ func TestBackendStates(t *testing.T, b Backend) {
 		if err := bar.WriteState(barState); err != nil {
 			t.Fatalf("bad: %s", err)
 		}
-		if err := bar.PersistState(nil); err != nil {
+		if err := bar.PersistState(ctx, nil); err != nil {
 			t.Fatalf("bad: %s", err)
 		}
 
 		// verify that foo is unchanged with the existing state manager
-		if err := foo.RefreshState(); err != nil {
+		if err := foo.RefreshState(ctx); err != nil {
 			t.Fatal("error refreshing foo:", err)
 		}
 		fooState = foo.State()
@@ -177,11 +182,11 @@ func TestBackendStates(t *testing.T, b Backend) {
 		}
 
 		// fetch foo again from the backend
-		foo, err = b.StateMgr("foo")
+		foo, err = b.StateMgr(ctx, "foo")
 		if err != nil {
 			t.Fatal("error re-fetching state:", err)
 		}
-		if err := foo.RefreshState(); err != nil {
+		if err := foo.RefreshState(ctx); err != nil {
 			t.Fatal("error refreshing foo:", err)
 		}
 		fooState = foo.State()
@@ -190,11 +195,11 @@ func TestBackendStates(t *testing.T, b Backend) {
 		}
 
 		// fetch the bar again from the backend
-		bar, err = b.StateMgr("bar")
+		bar, err = b.StateMgr(ctx, "bar")
 		if err != nil {
 			t.Fatal("error re-fetching state:", err)
 		}
-		if err := bar.RefreshState(); err != nil {
+		if err := bar.RefreshState(ctx); err != nil {
 			t.Fatal("error refreshing bar:", err)
 		}
 		barState = bar.State()
@@ -206,7 +211,7 @@ func TestBackendStates(t *testing.T, b Backend) {
 	// Verify we can now list them
 	{
 		// we determined that named stated are supported earlier
-		workspaces, err := b.Workspaces()
+		workspaces, err := b.Workspaces(ctx)
 		if err != nil {
 			t.Fatalf("err: %s", err)
 		}
@@ -222,36 +227,36 @@ func TestBackendStates(t *testing.T, b Backend) {
 	}
 
 	// Delete some workspaces
-	if err := b.DeleteWorkspace("foo", true); err != nil {
+	if err := b.DeleteWorkspace(ctx, "foo", true); err != nil {
 		t.Fatalf("err: %s", err)
 	}
 
 	// Verify the default state can't be deleted
-	if err := b.DeleteWorkspace(DefaultStateName, true); err == nil {
+	if err := b.DeleteWorkspace(ctx, DefaultStateName, true); err == nil {
 		t.Fatal("expected error")
 	}
 
 	// Create and delete the foo workspace again.
 	// Make sure that there are no leftover artifacts from a deleted state
 	// preventing re-creation.
-	foo, err = b.StateMgr("foo")
+	foo, err = b.StateMgr(ctx, "foo")
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	if err := foo.RefreshState(); err != nil {
+	if err := foo.RefreshState(ctx); err != nil {
 		t.Fatalf("bad: %s", err)
 	}
 	if v := foo.State(); v.HasManagedResourceInstanceObjects() {
 		t.Fatalf("should be empty: %s", v)
 	}
 	// and delete it again
-	if err := b.DeleteWorkspace("foo", true); err != nil {
+	if err := b.DeleteWorkspace(ctx, "foo", true); err != nil {
 		t.Fatalf("err: %s", err)
 	}
 
 	// Verify deletion
 	{
-		workspaces, err := b.Workspaces()
+		workspaces, err := b.Workspaces(ctx)
 		if err != nil {
 			t.Fatalf("err: %s", err)
 		}
@@ -306,12 +311,14 @@ func testLocks(t *testing.T, b1, b2 Backend, testForceUnlock bool) {
 func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, workspace string) {
 	t.Helper()
 
+	ctx := context.Background()
+
 	// Get the default state for each
-	b1StateMgr, err := b1.StateMgr(DefaultStateName)
+	b1StateMgr, err := b1.StateMgr(ctx, DefaultStateName)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	if err := b1StateMgr.RefreshState(); err != nil {
+	if err := b1StateMgr.RefreshState(ctx); err != nil {
 		t.Fatalf("bad: %s", err)
 	}
 
@@ -323,11 +330,11 @@ func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, wo
 
 	t.Logf("TestBackend: testing state locking for %T", b1)
 
-	b2StateMgr, err := b2.StateMgr(DefaultStateName)
+	b2StateMgr, err := b2.StateMgr(ctx, DefaultStateName)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	if err := b2StateMgr.RefreshState(); err != nil {
+	if err := b2StateMgr.RefreshState(ctx); err != nil {
 		t.Fatalf("bad: %s", err)
 	}
 
@@ -343,7 +350,7 @@ func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, wo
 	infoB.Operation = "test"
 	infoB.Who = "clientB"
 
-	lockIDA, err := lockerA.Lock(infoA)
+	lockIDA, err := lockerA.Lock(ctx, infoA)
 	if err != nil {
 		t.Fatal("unable to get initial lock:", err)
 	}
@@ -351,7 +358,7 @@ func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, wo
 	// Make sure we can still get the statemgr.Full from another instance even
 	// when locked.  This should only happen when a state is loaded via the
 	// backend, and as a remote state.
-	_, err = b2.StateMgr(DefaultStateName)
+	_, err = b2.StateMgr(ctx, DefaultStateName)
 	if err != nil {
 		t.Errorf("failed to read locked state from another backend instance: %s", err)
 	}
@@ -362,17 +369,17 @@ func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, wo
 		return
 	}
 
-	_, err = lockerB.Lock(infoB)
+	_, err = lockerB.Lock(ctx, infoB)
 	if err == nil {
-		lockerA.Unlock(lockIDA)
+		lockerA.Unlock(ctx, lockIDA)
 		t.Fatal("client B obtained lock while held by client A")
 	}
 
-	if err := lockerA.Unlock(lockIDA); err != nil {
+	if err := lockerA.Unlock(ctx, lockIDA); err != nil {
 		t.Fatal("error unlocking client A", err)
 	}
 
-	lockIDB, err := lockerB.Lock(infoB)
+	lockIDB, err := lockerB.Lock(ctx, infoB)
 	if err != nil {
 		t.Fatal("unable to obtain lock from client B")
 	}
@@ -381,7 +388,7 @@ func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, wo
 		t.Errorf("duplicate lock IDs: %q", lockIDB)
 	}
 
-	if err = lockerB.Unlock(lockIDB); err != nil {
+	if err = lockerB.Unlock(ctx, lockIDB); err != nil {
 		t.Fatal("error unlocking client B:", err)
 	}
 
@@ -397,18 +404,18 @@ func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, wo
 		panic(err)
 	}
 
-	lockIDA, err = lockerA.Lock(infoA)
+	lockIDA, err = lockerA.Lock(ctx, infoA)
 	if err != nil {
 		t.Fatal("unable to get re lock A:", err)
 	}
 	unlock := func() {
-		err := lockerA.Unlock(lockIDA)
+		err := lockerA.Unlock(ctx, lockIDA)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	_, err = lockerB.Lock(infoB)
+	_, err = lockerB.Lock(ctx, infoB)
 	if err == nil {
 		unlock()
 		t.Fatal("client B obtained lock while held by client A")
@@ -421,7 +428,7 @@ func testLocksInWorkspace(t *testing.T, b1, b2 Backend, testForceUnlock bool, wo
 	}
 
 	// try to unlock with the second unlocker, using the ID from the error
-	if err := lockerB.Unlock(infoErr.Info.ID); err != nil {
+	if err := lockerB.Unlock(ctx, infoErr.Info.ID); err != nil {
 		unlock()
 		t.Fatalf("could not unlock with the reported ID %q: %s", infoErr.Info.ID, err)
 	}

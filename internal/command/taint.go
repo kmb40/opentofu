@@ -4,6 +4,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -88,8 +89,10 @@ func (c *TaintCommand) Run(args []string) int {
 		return 1
 	}
 
+	ctx := context.TODO()
+
 	// Get the state
-	stateMgr, err := b.StateMgr(workspace)
+	stateMgr, err := b.StateMgr(ctx, workspace)
 	if err != nil {
 		c.Ui.Error(fmt.Sprintf("Failed to load state: %s", err))
 		return 1
@@ -108,7 +111,7 @@ func (c *TaintCommand) Run(args []string) int {
 		}()
 	}
 
-	if err := stateMgr.RefreshState(); err != nil {
+	if err := stateMgr.RefreshState(ctx); err != nil {
 		c.Ui.Error(fmt.Sprintf("Failed to load state: %s", err))
 		return 1
 	}
@@ -183,7 +186,7 @@ func (c *TaintCommand) Run(args []string) int {
 		c.Ui.Error(fmt.Sprintf("Error writing state file: %s", err))
 		return 1
 	}
-	if err := stateMgr.PersistState(schemas); err != nil {
+	if err := stateMgr.PersistState(ctx, schemas); err != nil {
 		c.Ui.Error(fmt.Sprintf("Error writing state file: %s", err))
 		return 1
 	}

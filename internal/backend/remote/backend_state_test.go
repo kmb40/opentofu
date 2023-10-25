@@ -5,6 +5,7 @@ package remote
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
 
@@ -28,12 +29,14 @@ func TestRemoteClient_stateLock(t *testing.T) {
 	b, bCleanup := testBackendDefault(t)
 	defer bCleanup()
 
-	s1, err := b.StateMgr(backend.DefaultStateName)
+	ctx := context.Background()
+
+	s1, err := b.StateMgr(ctx, backend.DefaultStateName)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	s2, err := b.StateMgr(backend.DefaultStateName)
+	s2, err := b.StateMgr(ctx, backend.DefaultStateName)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -57,7 +60,7 @@ func TestRemoteClient_Put_withRunID(t *testing.T) {
 
 	// Store the new state to verify (this will be done
 	// by the mock that is used) that the run ID is set.
-	if err := client.Put(buf.Bytes()); err != nil {
+	if err := client.Put(context.Background(), buf.Bytes()); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }

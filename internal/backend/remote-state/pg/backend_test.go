@@ -7,6 +7,7 @@ package pg
 // TF_ACC=1 GO111MODULE=on go test -v -mod=vendor -timeout=2m -parallel=4 github.com/opentofu/opentofu/backend/remote-state/pg
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net/url"
@@ -149,14 +150,16 @@ func TestBackendConfig(t *testing.T) {
 			}
 			defer dbCleaner.Query(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", schemaName))
 
+			ctx := context.Background()
+
 			var diags tfdiags.Diagnostics
 			b := New().(*Backend)
-			schema := b.ConfigSchema()
+			schema := b.ConfigSchema(ctx)
 			spec := schema.DecoderSpec()
 			obj, decDiags := hcldec.Decode(config, spec, nil)
 			diags = diags.Append(decDiags)
 
-			newObj, valDiags := b.PrepareConfig(obj)
+			newObj, valDiags := b.PrepareConfig(ctx, obj)
 			diags = diags.Append(valDiags.InConfigBody(config, ""))
 
 			if tc.ExpectConfigurationError != "" {
@@ -173,7 +176,7 @@ func TestBackendConfig(t *testing.T) {
 
 			obj = newObj
 
-			confDiags := b.Configure(obj)
+			confDiags := b.Configure(ctx, obj)
 			if tc.ExpectConnectionError != "" {
 				err := confDiags.InConfigBody(config, "").ErrWithWarnings()
 				if err == nil {
@@ -197,12 +200,12 @@ func TestBackendConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, err = b.StateMgr(backend.DefaultStateName)
+			_, err = b.StateMgr(ctx, backend.DefaultStateName)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			s, err := b.StateMgr(backend.DefaultStateName)
+			s, err := b.StateMgr(ctx, backend.DefaultStateName)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -338,12 +341,14 @@ func TestBackendConfigSkipOptions(t *testing.T) {
 				}
 			}
 
-			_, err = b.StateMgr(backend.DefaultStateName)
+			ctx := context.Background()
+
+			_, err = b.StateMgr(ctx, backend.DefaultStateName)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			s, err := b.StateMgr(backend.DefaultStateName)
+			s, err := b.StateMgr(ctx, backend.DefaultStateName)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -434,6 +439,8 @@ func TestBackendConcurrentLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	ctx := context.Background()
+
 	getStateMgr := func(schemaName string) (statemgr.Full, *statemgr.LockInfo) {
 		defer dbCleaner.Query(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", schemaName))
 		config := backend.TestWrapConfig(map[string]interface{}{
@@ -445,7 +452,8 @@ func TestBackendConcurrentLock(t *testing.T) {
 		if b == nil {
 			t.Fatal("Backend could not be configured")
 		}
-		stateMgr, err := b.StateMgr(backend.DefaultStateName)
+
+		stateMgr, err := b.StateMgr(ctx, backend.DefaultStateName)
 		if err != nil {
 			t.Fatalf("Failed to get the state manager: %v", err)
 		}
@@ -462,48 +470,48 @@ func TestBackendConcurrentLock(t *testing.T) {
 
 	// First we need to create the workspace as the lock for creating them is
 	// global
-	lockID1, err := s1.Lock(i1)
+	lockID1, err := s1.Lock(ctx, i1)
 	if err != nil {
 		t.Fatalf("failed to lock first state: %v", err)
 	}
 
-	if err = s1.PersistState(nil); err != nil {
+	if err = s1.PersistState(ctx, nil); err != nil {
 		t.Fatalf("failed to persist state: %v", err)
 	}
 
-	if err := s1.Unlock(lockID1); err != nil {
+	if err := s1.Unlock(ctx, lockID1); err != nil {
 		t.Fatalf("failed to unlock first state: %v", err)
 	}
 
-	lockID2, err := s2.Lock(i2)
+	lockID2, err := s2.Lock(ctx, i2)
 	if err != nil {
 		t.Fatalf("failed to lock second state: %v", err)
 	}
 
-	if err = s2.PersistState(nil); err != nil {
+	if err = s2.PersistState(ctx, nil); err != nil {
 		t.Fatalf("failed to persist state: %v", err)
 	}
 
-	if err := s2.Unlock(lockID2); err != nil {
+	if err := s2.Unlock(ctx, lockID2); err != nil {
 		t.Fatalf("failed to unlock first state: %v", err)
 	}
 
 	// Now we can test concurrent lock
-	lockID1, err = s1.Lock(i1)
+	lockID1, err = s1.Lock(ctx, i1)
 	if err != nil {
 		t.Fatalf("failed to lock first state: %v", err)
 	}
 
-	lockID2, err = s2.Lock(i2)
+	lockID2, err = s2.Lock(ctx, i2)
 	if err != nil {
 		t.Fatalf("failed to lock second state: %v", err)
 	}
 
-	if err := s1.Unlock(lockID1); err != nil {
+	if err := s1.Unlock(ctx, lockID1); err != nil {
 		t.Fatalf("failed to unlock first state: %v", err)
 	}
 
-	if err := s2.Unlock(lockID2); err != nil {
+	if err := s2.Unlock(ctx, lockID2); err != nil {
 		t.Fatalf("failed to unlock first state: %v", err)
 	}
 }

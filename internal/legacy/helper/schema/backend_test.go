@@ -133,7 +133,10 @@ func TestBackendPrepare(t *testing.T) {
 			if tc.Config != nil {
 				cfgVal = cty.ObjectVal(tc.Config)
 			}
-			configVal, diags := tc.B.PrepareConfig(cfgVal)
+
+			ctx := context.Background()
+
+			configVal, diags := tc.B.PrepareConfig(ctx, cfgVal)
 			if diags.HasErrors() != tc.Err {
 				for _, d := range diags {
 					t.Error(d.Description())
@@ -187,7 +190,7 @@ func TestBackendConfigure(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("%d-%s", i, tc.Name), func(t *testing.T) {
-			diags := tc.B.Configure(cty.ObjectVal(tc.Config))
+			diags := tc.B.Configure(context.Background(), cty.ObjectVal(tc.Config))
 			if diags.HasErrors() != tc.Err {
 				t.Errorf("wrong number of diagnostics")
 			}

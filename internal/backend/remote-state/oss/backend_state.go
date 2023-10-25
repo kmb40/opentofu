@@ -4,6 +4,7 @@
 package oss
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -52,7 +53,7 @@ func (b *Backend) remoteClient(name string) (*RemoteClient, error) {
 	return client, nil
 }
 
-func (b *Backend) Workspaces() ([]string, error) {
+func (b *Backend) Workspaces(ctx context.Context) ([]string, error) {
 	bucket, err := b.ossClient.Bucket(b.bucketName)
 	if err != nil {
 		return []string{""}, fmt.Errorf("error getting bucket: %w", err)
@@ -99,7 +100,7 @@ func (b *Backend) Workspaces() ([]string, error) {
 	return result, nil
 }
 
-func (b *Backend) DeleteWorkspace(name string, _ bool) error {
+func (b *Backend) DeleteWorkspace(ctx context.Context, name string, _ bool) error {
 	if name == backend.DefaultStateName || name == "" {
 		return fmt.Errorf("can't delete default state")
 	}
@@ -108,10 +109,10 @@ func (b *Backend) DeleteWorkspace(name string, _ bool) error {
 	if err != nil {
 		return err
 	}
-	return client.Delete()
+	return client.Delete(ctx)
 }
 
-func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
+func (b *Backend) StateMgr(ctx context.Context, name string) (statemgr.Full, error) {
 	client, err := b.remoteClient(name)
 	if err != nil {
 		return nil, err
@@ -119,7 +120,7 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 	stateMgr := &remote.State{Client: client}
 
 	// Check to see if this state already exists.
-	existing, err := b.Workspaces()
+	existing, err := b.Workspaces(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -138,21 +139,21 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 		// take a lock on this state while we write it
 		lockInfo := statemgr.NewLockInfo()
 		lockInfo.Operation = "init"
-		lockId, err := client.Lock(lockInfo)
+		lockId, err := client.Lock(ctx, lockInfo)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock OSS state: %w", err)
 		}
 
 		// Local helper function so we can call it multiple places
 		lockUnlock := func(e error) error {
-			if err := stateMgr.Unlock(lockId); err != nil {
+			if err := stateMgr.Unlock(ctx, lockId); err != nil {
 				return fmt.Errorf(strings.TrimSpace(stateUnlockError), lockId, err)
 			}
 			return e
 		}
 
 		// Grab the value
-		if err := stateMgr.RefreshState(); err != nil {
+		if err := stateMgr.RefreshState(ctx); err != nil {
 			err = lockUnlock(err)
 			return nil, err
 		}
@@ -163,7 +164,7 @@ func (b *Backend) StateMgr(name string) (statemgr.Full, error) {
 				err = lockUnlock(err)
 				return nil, err
 			}
-			if err := stateMgr.PersistState(nil); err != nil {
+			if err := stateMgr.PersistState(ctx, nil); err != nil {
 				err = lockUnlock(err)
 				return nil, err
 			}

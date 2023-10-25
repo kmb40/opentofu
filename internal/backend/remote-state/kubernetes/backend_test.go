@@ -89,7 +89,9 @@ func TestBackendLocksSoak(t *testing.T) {
 			"secret_suffix": secretSuffix,
 		}))
 
-		s, err := b.StateMgr(backend.DefaultStateName)
+		ctx := context.Background()
+
+		s, err := b.StateMgr(ctx, backend.DefaultStateName)
 		if err != nil {
 			t.Fatalf("Error creating state manager: %v", err)
 		}
@@ -99,6 +101,8 @@ func TestBackendLocksSoak(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	for i, l := range lockers {
+		ctx := context.Background()
+
 		wg.Add(1)
 		go func(locker statemgr.Locker, n int) {
 			defer wg.Done()
@@ -108,7 +112,7 @@ func TestBackendLocksSoak(t *testing.T) {
 			li.Who = fmt.Sprintf("client-%v", n)
 
 			for i := 0; i < lockAttempts; i++ {
-				id, err := locker.Lock(li)
+				id, err := locker.Lock(ctx, li)
 				if err != nil {
 					continue
 				}
@@ -116,7 +120,7 @@ func TestBackendLocksSoak(t *testing.T) {
 				// hold onto the lock for a little bit
 				time.Sleep(time.Duration(rand.Intn(10)) * time.Microsecond)
 
-				err = locker.Unlock(id)
+				err = locker.Unlock(ctx, id)
 				if err != nil {
 					t.Errorf("failed to unlock: %v", err)
 				}

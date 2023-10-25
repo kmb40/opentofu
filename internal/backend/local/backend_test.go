@@ -4,6 +4,7 @@
 package local
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -97,7 +98,9 @@ func TestLocal_addAndRemoveStates(t *testing.T) {
 	expectedStates := []string{dflt}
 
 	b := New()
-	states, err := b.Workspaces()
+	ctx := context.Background()
+
+	states, err := b.Workspaces(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,11 +110,11 @@ func TestLocal_addAndRemoveStates(t *testing.T) {
 	}
 
 	expectedA := "test_A"
-	if _, err := b.StateMgr(expectedA); err != nil {
+	if _, err := b.StateMgr(ctx, expectedA); err != nil {
 		t.Fatal(err)
 	}
 
-	states, err = b.Workspaces()
+	states, err = b.Workspaces(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,11 +125,11 @@ func TestLocal_addAndRemoveStates(t *testing.T) {
 	}
 
 	expectedB := "test_B"
-	if _, err := b.StateMgr(expectedB); err != nil {
+	if _, err := b.StateMgr(ctx, expectedB); err != nil {
 		t.Fatal(err)
 	}
 
-	states, err = b.Workspaces()
+	states, err = b.Workspaces(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,11 +139,11 @@ func TestLocal_addAndRemoveStates(t *testing.T) {
 		t.Fatalf("expected %q, got %q", expectedStates, states)
 	}
 
-	if err := b.DeleteWorkspace(expectedA, true); err != nil {
+	if err := b.DeleteWorkspace(ctx, expectedA, true); err != nil {
 		t.Fatal(err)
 	}
 
-	states, err = b.Workspaces()
+	states, err = b.Workspaces(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,11 +153,11 @@ func TestLocal_addAndRemoveStates(t *testing.T) {
 		t.Fatalf("expected %q, got %q", expectedStates, states)
 	}
 
-	if err := b.DeleteWorkspace(expectedB, true); err != nil {
+	if err := b.DeleteWorkspace(ctx, expectedB, true); err != nil {
 		t.Fatal(err)
 	}
 
-	states, err = b.Workspaces()
+	states, err = b.Workspaces(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +167,7 @@ func TestLocal_addAndRemoveStates(t *testing.T) {
 		t.Fatalf("expected %q, got %q", expectedStates, states)
 	}
 
-	if err := b.DeleteWorkspace(dflt, true); err == nil {
+	if err := b.DeleteWorkspace(ctx, dflt, true); err == nil {
 		t.Fatal("expected error deleting default state")
 	}
 }
@@ -184,7 +187,7 @@ var errTestDelegateState = errors.New("state called")
 var errTestDelegateStates = errors.New("states called")
 var errTestDelegateDeleteState = errors.New("delete called")
 
-func (b *testDelegateBackend) StateMgr(name string) (statemgr.Full, error) {
+func (b *testDelegateBackend) StateMgr(_ context.Context, name string) (statemgr.Full, error) {
 	if b.stateErr {
 		return nil, errTestDelegateState
 	}
@@ -192,14 +195,14 @@ func (b *testDelegateBackend) StateMgr(name string) (statemgr.Full, error) {
 	return s, nil
 }
 
-func (b *testDelegateBackend) Workspaces() ([]string, error) {
+func (b *testDelegateBackend) Workspaces(context.Context) ([]string, error) {
 	if b.statesErr {
 		return nil, errTestDelegateStates
 	}
 	return []string{"default"}, nil
 }
 
-func (b *testDelegateBackend) DeleteWorkspace(name string, force bool) error {
+func (b *testDelegateBackend) DeleteWorkspace(_ context.Context, name string, force bool) error {
 	if b.deleteErr {
 		return errTestDelegateDeleteState
 	}
@@ -215,15 +218,17 @@ func TestLocal_multiStateBackend(t *testing.T) {
 		deleteErr: true,
 	})
 
-	if _, err := b.StateMgr("test"); err != errTestDelegateState {
+	ctx := context.Background()
+
+	if _, err := b.StateMgr(ctx, "test"); err != errTestDelegateState {
 		t.Fatal("expected errTestDelegateState, got:", err)
 	}
 
-	if _, err := b.Workspaces(); err != errTestDelegateStates {
+	if _, err := b.Workspaces(ctx); err != errTestDelegateStates {
 		t.Fatal("expected errTestDelegateStates, got:", err)
 	}
 
-	if err := b.DeleteWorkspace("test", true); err != errTestDelegateDeleteState {
+	if err := b.DeleteWorkspace(ctx, "test", true); err != errTestDelegateDeleteState {
 		t.Fatal("expected errTestDelegateDeleteState, got:", err)
 	}
 }
